@@ -1,23 +1,21 @@
+server:
+  port: 8080
 spring:
   cloud:
-    loadbalancer:
-      configurations: health-check
-      retry:
-        enabled: true
     gateway:
-      actuator.verbose.enabled: false
-      discovery:
-        locator:
-          enabled: true
+      discovery.locator.enabled: true
       routes:
         - id: main-service
           uri: lb://main-service
           predicates:
-            - Path=/categories/**, /admin/**, /users/**, /events/**, compilations/**
-        - id: stats-service
+            - Path=/categories/**, /admin/**, /users/**, /events/**, /compilations/**
+        - id: stats-server
           uri: lb://stats-server
           predicates:
-            - Path=/stats/**, /hit/**
-
-server:
-  port: 8080
+            - Path=/hit/**, /stats/**
+eureka:
+  client:
+    serviceUrl:
+      defaultZone: http://localhost:8761/eureka/
+  instance:
+    prefer-ip-address: true
