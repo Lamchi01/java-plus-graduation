@@ -13,3 +13,12 @@ spring:
           uri: lb://stats-server
           predicates:
             - Path=/hit/**, /stats/**
+
+management:
+  endpoint:
+    gateway:
+      enabled: true
+  endpoints:
+    web:
+      exposure:
+        include: gateway
