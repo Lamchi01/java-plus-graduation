@@ -11,7 +11,9 @@ import ru.yandex.practicum.ParamDto;
 import ru.yandex.practicum.ParamHitDto;
 import ru.yandex.practicum.ViewStats;
 
+import java.io.InputStream;
 import java.util.List;
+import java.util.Properties;
 
 @Slf4j
 @Component
@@ -61,12 +63,24 @@ public class RestStatClient implements StatClient {
     private ServiceInstance getInstance() {
         try {
             return discoveryClient
-                    .getInstances("stats-server")
+                    .getInstances(getStatsServerName())
                     .getFirst();
         } catch (Exception e) {
             throw new RuntimeException(
                     "Ошибка обнаружения адреса сервиса статистики с id: " + "stats-server", e
             );
+        }
+    }
+
+    private static String getStatsServerName() {
+        Properties properties = new Properties();
+        try (InputStream is = RestStatClient.class.getClassLoader().getResourceAsStream("application.properties")) {
+            properties.load(is);
+            return properties.getProperty("stats.server.name");
+        } catch (Exception e) {
+            log.info(e.getMessage());
+            log.debug("Не найдено или не указано конфигурационное поле stats.server.name");
+            return null;
         }
     }
 }
