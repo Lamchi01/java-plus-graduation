@@ -19,7 +19,7 @@
     <modules>
         <module>core</module>
         <module>infra</module>
-        <module>stat</module>
+        <module>stats</module>
     </modules>
 
     <properties>

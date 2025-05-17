@@ -1,5 +1,6 @@
 package ru.yandex.practicum.event.controller;
 
+import org.springframework.beans.factory.annotation.Value;
 import ru.yandex.practicum.ParamHitDto;
 import ru.yandex.practicum.client.RestStatClient;
 import ru.yandex.practicum.event.dto.EventFullDto;
@@ -21,7 +22,8 @@ import static ru.yandex.practicum.utility.Constants.FORMAT_DATETIME;
 @RequestMapping("/events")
 @RequiredArgsConstructor
 public class PublicEventController {
-    private static final String MAIN_SERVICE = "ewm-main-service";
+    @Value("${main.service.name}")
+    private String MAIN_SERVICE;
     private final EventService eventService;
     private final RestStatClient statClient;
 
