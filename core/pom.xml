@@ -17,7 +17,7 @@
         <module>compilation-service</module>
         <module>event-service</module>
         <module>interaction-api</module>
-        <module>requests-service</module>
+        <module>request-service</module>
         <module>user-service</module>
     </modules>
 

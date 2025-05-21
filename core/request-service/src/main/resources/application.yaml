@@ -1,6 +1,6 @@
 spring:
   application:
-    name: requests-service
+    name: request-service
   config:
     import: "configserver:"
   cloud:

@@ -5,8 +5,8 @@ spring:
     gateway:
       discovery.locator.enabled: true
       routes:
-        - id: requests_service_route
-          uri: lb://requests-service
+        - id: request_service_route
+          uri: lb://request-service
           predicates:
             - Path=/users/{userId}/requests/**, /users/{userId}/events/{eventId}/requests/**
 

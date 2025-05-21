@@ -9,7 +9,7 @@
         <version>0.0.1-SNAPSHOT</version>
     </parent>
 
-    <artifactId>requests-service</artifactId>
+    <artifactId>request-service</artifactId>
 
     <properties>
         <maven.compiler.source>21</maven.compiler.source>

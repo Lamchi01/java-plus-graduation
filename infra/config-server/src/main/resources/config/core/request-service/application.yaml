@@ -1,6 +1,6 @@
 spring:
   application:
-    name: requests-service
+    name: request-service
   jpa:
     hibernate:
       ddl-auto: none
