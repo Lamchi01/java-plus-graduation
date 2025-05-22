@@ -1,6 +1,7 @@
 package ru.yandex.practicum.service;
 
 import ru.yandex.practicum.user.dto.UserDto;
+import ru.yandex.practicum.user.dto.UserShortDto;
 import ru.yandex.practicum.user.model.User;
 
 import java.util.List;
@@ -14,4 +15,8 @@ public interface UserService {
     void delete(Long id);
 
     Optional<User> getUserById(Long id);
+
+    UserShortDto getUserShortById(Long userIid);
+
+    List<UserShortDto> getAllUsersShort(List<Long> userIds);
 }

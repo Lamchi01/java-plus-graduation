@@ -3,7 +3,6 @@ package ru.yandex.practicum.repository;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
-import ru.yandex.practicum.event.model.Event;
 import ru.yandex.practicum.requests.model.Request;
 import ru.yandex.practicum.requests.model.RequestStatus;
 
@@ -11,20 +10,20 @@ import java.util.List;
 import java.util.Optional;
 
 public interface RequestRepository extends JpaRepository<Request, Long> {
-    Optional<Request> findByRequesterIdAndEventId(Long requestId, Long userId);
+    Optional<Request> findByRequesterAndEvent(Long requestId, Long userId);
 
-    @Query("SELECT COUNT (r) FROM Request r WHERE r.event = :event AND r.status = :status")
-    Long countRequestsByEventAndStatus(Event event, RequestStatus status);
+    @Query("SELECT COUNT (r) FROM Request r WHERE r.event = :eventId AND r.status = :status")
+    Long countRequestsByEventIdAndStatus(Long eventId, RequestStatus status);
 
-    List<Request> findByRequesterId(Long userId);
+    List<Request> findByRequester(Long userId);
 
-    Optional<Request> findByIdAndRequesterId(Long requestId, Long userId);
+    Optional<Request> findByIdAndRequester(Long requestId, Long userId);
 
-    Optional<Request> findByEventId(Long eventId);
+    Optional<Request> findByEvent(Long eventId);
 
-    Optional<Request> findByIdAndEventId(Long requestId, Long eventId);
+    Optional<Request> findByIdAndEvent(Long requestId, Long eventId);
 
-    List<Request> findAllByEventIdInAndStatus(List<Long> eventIds, RequestStatus state);
+    List<Request> findAllByEventInAndStatus(List<Long> eventIds, RequestStatus state);
 
-    Long countByEventIdAndStatus(Long eventId, RequestStatus status);
+    Long countByEventAndStatus(Long eventId, RequestStatus status);
 }

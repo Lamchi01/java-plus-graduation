@@ -5,7 +5,6 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import ru.yandex.practicum.category.model.Category;
-import ru.yandex.practicum.user.model.User;
 
 import java.time.LocalDateTime;
 
@@ -33,9 +32,8 @@ public class Event {
     @Column(name = "event_date")
     private LocalDateTime eventDate; // дата проведения события
 
-    @ManyToOne
-    @JoinColumn(name = "initiator_id")
-    private User initiator;
+    @Column(name = "initiator_id")
+    private Long initiator;
 
     @ManyToOne
     @JoinColumn(name = "location_id")

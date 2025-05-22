@@ -8,6 +8,7 @@ import ru.yandex.practicum.exception.EntityNotFoundException;
 import ru.yandex.practicum.mapper.UserMapper;
 import ru.yandex.practicum.repository.UserRepository;
 import ru.yandex.practicum.user.dto.UserDto;
+import ru.yandex.practicum.user.dto.UserShortDto;
 import ru.yandex.practicum.user.model.User;
 
 import java.util.List;
@@ -45,5 +46,18 @@ public class UserServiceImpl implements UserService {
     @Override
     public Optional<User> getUserById(Long id) {
         return userRepository.findById(id);
+    }
+
+    @Override
+    public UserShortDto getUserShortById(Long userIid) {
+        return userMapper.toUserShortDto(userRepository.findById(userIid)
+                .orElseThrow(() -> new EntityNotFoundException(User.class, "Пользователь c ID - " + userIid + ", не найден.")));
+    }
+
+    @Override
+    public List<UserShortDto> getAllUsersShort(List<Long> userIds) {
+        return userRepository.findByIdIn(userIds).stream()
+                .map(userMapper::toUserShortDto)
+                .toList();
     }
 }

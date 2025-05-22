@@ -32,7 +32,7 @@ public class RequestServiceImpl implements RequestService {
 
     @Override
     public List<ParticipationRequestDto> getUserRequests(Long userId) {
-        List<Request> requests = requestRepository.findByRequesterId(userId);
+        List<Request> requests = requestRepository.findByRequester(userId);
         return requests.stream()
                 .map(requestMapper::toParticipationRequestDto)
                 .toList();
@@ -44,7 +44,7 @@ public class RequestServiceImpl implements RequestService {
             throw new InitiatorRequestException("Пользователь с ID - " + userId + ", не найден.");
         }
 
-        if (requestRepository.findByRequesterIdAndEventId(userId, eventId).isPresent()) {
+        if (requestRepository.findByRequesterAndEvent(userId, eventId).isPresent()) {
             throw new RepeatUserRequestorException("Пользователь с ID - " + userId + ", уже заявился на событие с ID - " + eventId + ".");
         }
         Event event = eventRepository.getEventFullById(eventId)
@@ -55,10 +55,10 @@ public class RequestServiceImpl implements RequestService {
 
         Request request = new Request();
         request.setRequester(userRepository.getUserById(userId)
-                .orElseThrow(() -> new EntityNotFoundException(User.class, "Пользователь с ID - " + userId + ", не найден.")));
-        request.setEvent(event);
+                .orElseThrow(() -> new EntityNotFoundException(User.class, "Пользователь с ID - " + userId + ", не найден.")).getId());
+        request.setEvent(event.getId());
 
-        Long confirmedRequests = requestRepository.countRequestsByEventAndStatus(event, RequestStatus.CONFIRMED);
+        Long confirmedRequests = requestRepository.countRequestsByEventIdAndStatus(event.getId(), RequestStatus.CONFIRMED);
         if (confirmedRequests >= event.getParticipantLimit() && event.getParticipantLimit() != 0) {
             throw new ParticipantLimitException("Достигнут лимит участников для данного события.");
         }
@@ -80,7 +80,7 @@ public class RequestServiceImpl implements RequestService {
 
     @Override
     public ParticipationRequestDto cancelRequest(Long userId, Long requestId) {
-        Request cancelRequest = requestRepository.findByIdAndRequesterId(requestId, userId)
+        Request cancelRequest = requestRepository.findByIdAndRequester(requestId, userId)
                 .orElseThrow(() -> new EntityNotFoundException(Request.class, "Запрос с ID - " + requestId + ", не найден."));
         cancelRequest.setStatus(RequestStatus.CANCELED);
         return requestMapper.toParticipationRequestDto(requestRepository.save(cancelRequest));
@@ -90,10 +90,10 @@ public class RequestServiceImpl implements RequestService {
     public List<ParticipationRequestDto> getEventRequests(Long userId, Long eventId) {
         List<Event> userEvents = eventRepository.getAllEventByInitiatorId(userId);
         Event event = userEvents.stream()
-                .filter(e -> e.getInitiator().getId().equals(userId))
+                .filter(e -> e.getInitiator().equals(userId))
                 .findFirst()
                 .orElseThrow(() -> new ValidationException("Пользователь с ID - " + userId + ", не является инициатором события с ID - " + eventId + "."));
-        return requestRepository.findByEventId(event.getId()).stream()
+        return requestRepository.findByEvent(event.getId()).stream()
                 .map(requestMapper::toParticipationRequestDto)
                 .toList();
     }
@@ -109,14 +109,14 @@ public class RequestServiceImpl implements RequestService {
 
         List<Long> requestIds = eventRequest.getRequestIds();
         List<Request> requests = requestIds.stream()
-                .map(r -> requestRepository.findByIdAndEventId(r, eventId)
+                .map(r -> requestRepository.findByIdAndEvent(r, eventId)
                         .orElseThrow(() -> new ValidationException("Запрос с ID - " + r + ", не найден.")))
                 .toList();
 
         List<ParticipationRequestDto> confirmedRequests = new ArrayList<>();
         List<ParticipationRequestDto> rejectedRequests = new ArrayList<>();
 
-        Long confirmedRequestsCount = requestRepository.countRequestsByEventAndStatus(event, RequestStatus.CONFIRMED);
+        Long confirmedRequestsCount = requestRepository.countRequestsByEventIdAndStatus(event.getId(), RequestStatus.CONFIRMED);
 
         if (confirmedRequestsCount >= event.getParticipantLimit()) {
             throw new ParticipantLimitException("Достигнут лимит участников для данного события.");
@@ -159,11 +159,11 @@ public class RequestServiceImpl implements RequestService {
 
     @Override
     public Long getCountConfirmedRequestsByEventId(Long eventId) {
-        return requestRepository.countByEventIdAndStatus(eventId, RequestStatus.CONFIRMED);
+        return requestRepository.countByEventAndStatus(eventId, RequestStatus.CONFIRMED);
     }
 
     @Override
     public List<Request> findAllByEventIdIn(List<Long> eventIds) {
-        return requestRepository.findAllByEventIdInAndStatus(eventIds, RequestStatus.CONFIRMED);
+        return requestRepository.findAllByEventInAndStatus(eventIds, RequestStatus.CONFIRMED);
     }
 }

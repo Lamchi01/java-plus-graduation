@@ -7,6 +7,7 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import ru.yandex.practicum.service.UserService;
 import ru.yandex.practicum.user.dto.UserDto;
+import ru.yandex.practicum.user.dto.UserShortDto;
 import ru.yandex.practicum.user.model.User;
 
 import java.util.List;
@@ -41,5 +42,15 @@ public class AdminUserController {
     @GetMapping("/{id}")
     public Optional<User> getUserById(@PathVariable long id) {
         return userService.getUserById(id);
+    }
+
+    @GetMapping("/{userId}/short")
+    public UserShortDto getUserShortById(@PathVariable Long userId) {
+        return userService.getUserShortById(userId);
+    }
+
+    @GetMapping("/list")
+    public List<UserShortDto> getAllUsersShort(@RequestParam List<Long> ids) {
+        return userService.getAllUsersShort(ids);
     }
 }

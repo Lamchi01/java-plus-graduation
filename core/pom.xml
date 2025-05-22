@@ -12,9 +12,6 @@
     <artifactId>core</artifactId>
     <packaging>pom</packaging>
     <modules>
-        <module>category-service</module>
-        <module>comment-service</module>
-        <module>compilation-service</module>
         <module>event-service</module>
         <module>interaction-api</module>
         <module>request-service</module>
