@@ -1,11 +1,11 @@
 package ru.yandex.practicum.repository;
 
-import ru.yandex.practicum.ViewStats;
-import ru.yandex.practicum.model.EndpointHit;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import ru.yandex.practicum.ViewStats;
+import ru.yandex.practicum.model.EndpointHit;
 
 import java.time.LocalDateTime;
 import java.util.List;
