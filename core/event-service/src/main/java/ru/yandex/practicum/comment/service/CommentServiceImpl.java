@@ -12,14 +12,12 @@ import ru.yandex.practicum.comment.model.Comment;
 import ru.yandex.practicum.comment.repository.CommentRepository;
 import ru.yandex.practicum.event.clients.RequestsClient;
 import ru.yandex.practicum.event.clients.UserClient;
-import ru.yandex.practicum.event.dto.EventCommentCount;
 import ru.yandex.practicum.event.model.Event;
 import ru.yandex.practicum.event.repository.EventRepository;
 import ru.yandex.practicum.exception.EntityNotFoundException;
 import ru.yandex.practicum.exception.InitiatorRequestException;
 import ru.yandex.practicum.exception.ValidationException;
 import ru.yandex.practicum.user.dto.UserShortDto;
-import ru.yandex.practicum.user.model.User;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -31,8 +29,8 @@ public class CommentServiceImpl implements CommentService {
     private final CommentMapper commentMapper;
 
     private final EventRepository eventRepository;
-    private final UserClient userRepository;
-    private final RequestsClient requestRepository;
+    private final UserClient userClient;
+    private final RequestsClient requestsClient;
 
     @Override
     public CommentDto privateAdd(Long userId, Long eventId, InputCommentDto inputCommentDto) {
@@ -40,10 +38,10 @@ public class CommentServiceImpl implements CommentService {
         if (event.getInitiator().equals(userId)) {
             throw new ValidationException(Comment.class, " Нельзя оставлять комментарии к своему событию.");
         }
-        if (requestRepository.getRequestsForUserEvent(userId, eventId).isEmpty()) {
+        if (requestsClient.getRequestsForUserEvent(userId, eventId).isEmpty()) {
             throw new ValidationException(Comment.class, " Пользователь с ID - " + userId + ", не заявился на событие с ID - " + eventId + ".");
         }
-        User author = findUser(userId);
+        UserShortDto author = findShortUser(userId);
 
         Comment comment = commentMapper.toComment(inputCommentDto, author, event);
         comment.setCreated(LocalDateTime.now());
@@ -52,7 +50,7 @@ public class CommentServiceImpl implements CommentService {
 
     @Override
     public void privateDelete(Long userId, Long commentId) {
-        User author = findUser(userId);
+        UserShortDto author = findShortUser(userId);
         Comment comment = findComment(commentId);
         if (!comment.getAuthor().equals(userId)) {
             throw new InitiatorRequestException(" Нельзя удалить комментарий другого пользователя.");
@@ -103,18 +101,8 @@ public class CommentServiceImpl implements CommentService {
     }
 
     @Override
-    public List<EventCommentCount> findAllByEventIds(List<Long> eventsIds) {
-        return commentRepository.findAllByEventIds(eventsIds);
-    }
-
-    @Override
-    public Long getCountCommentByEvent_Id(Long eventId) {
-        return commentRepository.countCommentByEvent_Id(eventId);
-    }
-
-    @Override
     public List<CommentDto> findCommentsByEventIdAndUserId(Long eventId, Long userId, Integer from, Integer size) {
-        User user = findUser(userId);
+        UserShortDto user = findShortUser(userId);
         Event event = findEvent(eventId);
         Pageable pageable = PageRequest.of(from, size);
         List<Comment> comments = commentRepository.findAllByEventIdAndAuthor(eventId, userId, pageable);
@@ -124,7 +112,7 @@ public class CommentServiceImpl implements CommentService {
 
     @Override
     public List<CommentDto> findCommentsByUserId(Long eventId, Integer from, Integer size) {
-        User user = findUser(eventId);
+        UserShortDto user = findShortUser(eventId);
         Pageable pageable = PageRequest.of(from, size);
         List<Comment> comments = commentRepository.findAllByAuthor(user.getId(), pageable);
         UserShortDto userShortDto = findShortUser(user.getId());
@@ -140,17 +128,12 @@ public class CommentServiceImpl implements CommentService {
                 );
     }
 
-    private User findUser(Long userId) {
-        return userRepository.getUserById(userId)
-                .orElseThrow(() -> new EntityNotFoundException(User.class, "Пользователь c ID - " + userId + ", не найден."));
-    }
-
     private Comment findComment(Long commentId) {
         return commentRepository.findById(commentId)
                 .orElseThrow(() -> new EntityNotFoundException(Comment.class, "Комментарий c ID - " + commentId + ", не найден."));
     }
 
     private UserShortDto findShortUser(Long userId) {
-        return userRepository.getUserShortById(userId);
+        return userClient.getUserShortById(userId);
     }
 }

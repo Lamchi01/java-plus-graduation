@@ -38,7 +38,7 @@ public class CompilationServiceImpl implements CompilationService {
     private final EventMapper eventMapper;
     private final CategoryRepository categoryRepository;
     private final CategoryMapper categoryMapper;
-    private final UserClient userRepository;
+    private final UserClient userClient;
 
     @Override
     public CompilationDto create(NewCompilationDto newCompilationDto) {
@@ -125,7 +125,7 @@ public class CompilationServiceImpl implements CompilationService {
     }
 
     private Map<Long, UserShortDto> getUsers(List<Long> userIds) {
-        return userRepository.getAllUsersShort(userIds).stream()
+        return userClient.getAllUsersShort(userIds).stream()
                 .collect(Collectors.toMap(UserShortDto::getId, user -> user));
     }
 }

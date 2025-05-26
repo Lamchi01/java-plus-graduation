@@ -20,9 +20,8 @@ import ru.yandex.practicum.exception.ConditionNotMetException;
 import ru.yandex.practicum.exception.EntityNotFoundException;
 import ru.yandex.practicum.exception.InitiatorRequestException;
 import ru.yandex.practicum.exception.ValidationException;
-import ru.yandex.practicum.requests.model.Request;
+import ru.yandex.practicum.requests.dto.ParticipationRequestDto;
 import ru.yandex.practicum.user.dto.UserShortDto;
-import ru.yandex.practicum.user.model.User;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -39,9 +38,9 @@ public class EventServiceImpl implements EventService {
     private final LocationRepository locationRepository;
 
     private final StatClient statClient;
-    private final UserClient userRepository;
+    private final UserClient userClient;
     private final CategoryRepository categoryRepository;
-    private final RequestsClient requestRepository;
+    private final RequestsClient requestsClient;
     private final CommentRepository commentRepository;
 
     @Override
@@ -61,8 +60,9 @@ public class EventServiceImpl implements EventService {
                 reqParam.getOnlyAvailable(),
                 pageable);
 
+        Map<Long, UserShortDto> usersMap = getUsersMap(events.stream().map(Event::getInitiator).toList());
         List<EventFullDto> eventFullDtos = events.stream()
-                .map(e -> eventMapper.toEventFullDto(e, findShortUser(e.getInitiator())))
+                .map(e -> eventMapper.toEventFullDto(e, usersMap.get(e.getInitiator())))
                 .toList();
         if (eventFullDtos.isEmpty()) {
             throw new ValidationException(ReqParam.class, " События не найдены");
@@ -108,8 +108,9 @@ public class EventServiceImpl implements EventService {
                 params.getRangeEnd(),
                 pageable);
 
+        Map<Long, UserShortDto> usersMap = getUsersMap(events.stream().map(Event::getInitiator).toList());
         List<EventFullDto> eventFullDtos = events.stream()
-                .map(event -> eventMapper.toEventFullDto(event, findShortUser(event.getInitiator())))
+                .map(event -> eventMapper.toEventFullDto(event, usersMap.get(event.getInitiator())))
                 .toList();
 
         return addRequests(addViews(eventFullDtos));
@@ -134,7 +135,7 @@ public class EventServiceImpl implements EventService {
         if (eventDate.isBefore(LocalDateTime.now().plusHours(2))) {
             throw new ValidationException(NewEventDto.class, "До начала события осталось меньше двух часов");
         }
-        UserShortDto initiator = userRepository.getUserShortById(userId);
+        UserShortDto initiator = userClient.getUserShortById(userId);
         Category category = categoryRepository.findById(newEventDto.getCategory())
                 .orElseThrow(() -> new EntityNotFoundException(Category.class, "Категория не найден"));
 
@@ -188,25 +189,23 @@ public class EventServiceImpl implements EventService {
     }
 
     @Override
-    public List<Event> getAllEventByInitiatorId(Long initiatorId) {
-        User initiator = userRepository.getUserById(initiatorId)
-                .orElseThrow(() -> new EntityNotFoundException(User.class, "Пользователь не найден"));
-        return eventRepository.findAllByInitiator(initiatorId);
+    public List<EventFullDto> getAllEventByInitiatorId(Long initiatorId) {
+        UserShortDto initiator = userClient.getUserShortById(initiatorId);
+        return eventRepository.findAllByInitiator(initiatorId).stream()
+                .map(event -> eventMapper.toEventFullDto(event, initiator))
+                .toList();
     }
 
     @Override
-    public List<Event> getAllEventsByIdIsIn(List<Long> ids) {
-        return eventRepository.findAllByIdIsIn(ids);
-    }
-
-    @Override
-    public Boolean existsByCategoryId(Long catId) {
-        return eventRepository.existsEventByCategoryId(catId);
+    public EventFullDto getEventById(Long eventId) {
+        Event event = eventRepository.findById(eventId)
+                .orElseThrow(() -> new EntityNotFoundException(Event.class, " c ID = " + eventId + ", не найдено."));
+        return eventMapper.toEventFullDto(event, findShortUser(event.getInitiator()));
     }
 
     @Override
     public List<EventShortDto> findUserEvents(Long userId, Integer from, Integer size) {
-        UserShortDto initiator = userRepository.getUserShortById(userId);
+        UserShortDto initiator = userClient.getUserShortById(userId);
         Pageable pageable = PageRequest.of(from, size);
         List<Event> events = eventRepository.findAllByInitiator(userId, pageable);
         List<EventFullDto> eventFullDtos = events.stream()
@@ -217,30 +216,25 @@ public class EventServiceImpl implements EventService {
 
     @Override
     public EventFullDto findUserEventById(Long userId, Long eventId) {
-        UserShortDto initiator = userRepository.getUserShortById(userId);
+        UserShortDto initiator = userClient.getUserShortById(userId);
         Event event = eventRepository.findByIdAndInitiator(eventId, userId)
-                .orElseThrow(() -> new EntityNotFoundException(Event.class, "Событие не найдено"));
+                .orElseThrow(() -> new EntityNotFoundException(Event.class, " Событие не найдено"));
 
         EventFullDto result = eventMapper.toEventFullDto(event, initiator);
         return addRequests(addViews(result));
     }
 
     @Override
-    public Optional<Event> getEventByIdAndInitiatorId(Long eventId, Long initiatorId) {
-        User initiator = userRepository.getUserById(initiatorId)
-                .orElseThrow(() -> new EntityNotFoundException(User.class, " Пользователь не найден"));
-        return eventRepository.findByIdAndInitiator(eventId, initiatorId);
-    }
-
-    @Override
-    public Optional<Event> getEventById(Long eventId) {
-        return eventRepository.findById(eventId);
+    public EventFullDto getEventByIdAndInitiatorId(Long userId, Long eventId) {
+        UserShortDto initiator = userClient.getUserShortById(userId);
+        Event event = eventRepository.findByIdAndInitiator(eventId, userId)
+                .orElseThrow(() -> new EntityNotFoundException(Event.class, " Событие не найдено c ID - event ID" + eventId + " и initiator ID - " + userId));
+        return eventMapper.toEventFullDto(event, initiator);
     }
 
     @Override
     public EventFullDto updateEventByUser(Long userId, Long eventId, UpdateEventUserRequest updateRequest) {
-        User initiator = userRepository.getUserById(userId)
-                .orElseThrow(() -> new EntityNotFoundException(User.class, "Пользователь не найден"));
+        UserShortDto initiator = userClient.getUserShortById(userId);
         Event event = eventRepository.findByIdAndInitiator(eventId, userId)
                 .orElseThrow(() -> new EntityNotFoundException(Event.class, "Событие не найдено"));
         if (event.getState() == EventState.PUBLISHED) {
@@ -340,21 +334,27 @@ public class EventServiceImpl implements EventService {
 
     private List<EventFullDto> addRequests(List<EventFullDto> eventDtos) {
         List<Long> eventIds = eventDtos.stream().map(EventFullDto::getId).toList();
-        List<Request> requests = requestRepository.findAllByEventIdIn(0L, eventIds);
+        List<ParticipationRequestDto> requests = requestsClient.findAllByEventIdIn(0L, eventIds);
         Map<Long, Long> requestsMap = requests.stream()
-                .collect(Collectors.groupingBy(Request::getEvent, Collectors.counting()));
+                .collect(Collectors.groupingBy(ParticipationRequestDto::getEvent, Collectors.counting()));
         eventDtos.forEach(eventDto -> eventDto.setConfirmedRequests(requestsMap.getOrDefault(eventDto.getId(), 0L)));
         return eventDtos;
     }
 
     private EventFullDto addRequests(EventFullDto eventDto) {
-        eventDto.setConfirmedRequests(
-                requestRepository.getCountConfirmedRequestsByEventId(eventDto.getInitiator().getId(), eventDto.getId())
-        );
+        List<ParticipationRequestDto> requestDtos = requestsClient.findAllByEventIdIn(0L, Collections.singletonList(eventDto.getId()));
+        Map<Long, Long> requestsMap = requestDtos.stream()
+                .collect(Collectors.groupingBy(ParticipationRequestDto::getEvent, Collectors.counting()));
+        eventDto.setConfirmedRequests(requestsMap.getOrDefault(eventDto.getId(), 0L));
         return eventDto;
     }
 
     private UserShortDto findShortUser(Long userId) {
-        return userRepository.getUserShortById(userId);
+        return userClient.getUserShortById(userId);
+    }
+
+    private Map<Long, UserShortDto> getUsersMap(List<Long> userIds) {
+        return userClient.getAllUsersShort(userIds).stream()
+                .collect(Collectors.toMap(UserShortDto::getId, user -> user));
     }
 }

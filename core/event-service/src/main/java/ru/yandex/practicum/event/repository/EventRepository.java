@@ -5,7 +5,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 import ru.yandex.practicum.event.model.Event;
-import ru.yandex.practicum.event.model.EventState;
 
 import java.time.LocalDateTime;
 import java.util.Collection;
@@ -53,8 +52,6 @@ public interface EventRepository extends JpaRepository<Event, Long> {
     List<Event> findAllByInitiator(Long initiatorId);
 
     List<Event> findAllByInitiator(Long initiatorId, Pageable pageable);
-
-    Optional<Event> findByIdAndState(Long eventId, EventState state);
 
     Boolean existsEventByCategoryId(Long categoryId);
 }

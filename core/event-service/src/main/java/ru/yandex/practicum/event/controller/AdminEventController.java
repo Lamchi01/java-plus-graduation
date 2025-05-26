@@ -8,12 +8,10 @@ import org.springframework.web.bind.annotation.*;
 import ru.yandex.practicum.event.dto.AdminEventParams;
 import ru.yandex.practicum.event.dto.EventFullDto;
 import ru.yandex.practicum.event.dto.UpdateEventAdminRequest;
-import ru.yandex.practicum.event.model.Event;
 import ru.yandex.practicum.event.service.EventService;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Optional;
 
 import static ru.yandex.practicum.utils.Constants.FORMAT_DATETIME;
 
@@ -44,18 +42,8 @@ public class AdminEventController {
         return eventService.update(eventId, updateEventAdminRequest);
     }
 
-    @GetMapping("/all")
-    public List<Event> getAllEventsByIdIsIn(@RequestParam List<Long> eventIds) {
-        return eventService.getAllEventsByIdIsIn(eventIds);
-    }
-
-    @GetMapping("{eventId}/full")
-    public Optional<Event> getEventByIdAndInitiatorId(@PathVariable long eventId) {
+    @GetMapping("/{eventId}/full")
+    public EventFullDto getEventFullById(@PathVariable long eventId) {
         return eventService.getEventById(eventId);
-    }
-
-    @GetMapping("/existsbycategory/{catId}")
-    public Boolean existsByCategory(@PathVariable long catId) {
-        return eventService.existsByCategoryId(catId);
     }
 }

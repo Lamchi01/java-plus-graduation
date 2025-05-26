@@ -9,12 +9,10 @@ import ru.yandex.practicum.event.dto.EventFullDto;
 import ru.yandex.practicum.event.dto.EventShortDto;
 import ru.yandex.practicum.event.dto.NewEventDto;
 import ru.yandex.practicum.event.dto.UpdateEventUserRequest;
-import ru.yandex.practicum.event.model.Event;
 import ru.yandex.practicum.event.service.EventService;
 
 import java.util.Collection;
 import java.util.List;
-import java.util.Optional;
 
 @RestController
 @RequiredArgsConstructor
@@ -46,8 +44,8 @@ public class PrivateEventController {
     }
 
     @GetMapping("{eventId}/optional")
-    Optional<Event> getEventByIdAndInitiatorId(@PathVariable long userId,
-                                               @PathVariable long eventId) {
+    public EventFullDto getEventByIdAndInitiatorId(@PathVariable long userId,
+                                                   @PathVariable long eventId) {
         return service.getEventByIdAndInitiatorId(userId, eventId);
     }
 
@@ -59,7 +57,7 @@ public class PrivateEventController {
     }
 
     @GetMapping("/initiator")
-    List<Event> getAllEventByInitiatorId(@PathVariable long userId) {
+    public List<EventFullDto> getAllEventByInitiatorId(@PathVariable long userId) {
         return service.getAllEventByInitiatorId(userId);
     }
 }

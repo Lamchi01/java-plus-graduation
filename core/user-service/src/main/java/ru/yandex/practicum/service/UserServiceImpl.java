@@ -12,7 +12,6 @@ import ru.yandex.practicum.user.dto.UserShortDto;
 import ru.yandex.practicum.user.model.User;
 
 import java.util.List;
-import java.util.Optional;
 
 @Service
 @AllArgsConstructor
@@ -41,11 +40,6 @@ public class UserServiceImpl implements UserService {
         userRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException(User.class, "Пользователь c ID - " + id + ", не найден."));
         userRepository.deleteById(id);
-    }
-
-    @Override
-    public Optional<User> getUserById(Long id) {
-        return userRepository.findById(id);
     }
 
     @Override

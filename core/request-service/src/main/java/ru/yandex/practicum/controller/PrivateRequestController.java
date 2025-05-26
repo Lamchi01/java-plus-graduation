@@ -6,7 +6,6 @@ import org.springframework.web.bind.annotation.*;
 import ru.yandex.practicum.requests.dto.EventRequestStatusUpdateRequest;
 import ru.yandex.practicum.requests.dto.EventRequestStatusUpdateResult;
 import ru.yandex.practicum.requests.dto.ParticipationRequestDto;
-import ru.yandex.practicum.requests.model.Request;
 import ru.yandex.practicum.service.RequestService;
 
 import java.util.List;
@@ -46,13 +45,8 @@ public class PrivateRequestController {
         return requestService.updateStatusRequest(userId, eventId, eventRequest);
     }
 
-    @GetMapping("/events/{eventId}/requests/confirmedcount")
-    public Long getCountConfirmedRequestsByEventId(@PathVariable Long userId, @PathVariable Long eventId) {
-        return requestService.getCountConfirmedRequestsByEventId(eventId);
-    }
-
     @GetMapping("/events/requests/all")
-    public List<Request> findAllByEventIdIn(@PathVariable Long userId, @RequestParam List<Long> eventIds) {
+    public List<ParticipationRequestDto> findAllByEventIdIn(@PathVariable Long userId, @RequestParam List<Long> eventIds) {
         return requestService.findAllByEventIdIn(eventIds);
     }
 }

@@ -3,9 +3,10 @@ package ru.yandex.practicum.service;
 import jakarta.validation.ValidationException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import ru.yandex.practicum.controller.clients.EventClient;
 import ru.yandex.practicum.controller.clients.UserClient;
-import ru.yandex.practicum.event.model.Event;
+import ru.yandex.practicum.event.dto.EventFullDto;
 import ru.yandex.practicum.event.model.EventState;
 import ru.yandex.practicum.exception.*;
 import ru.yandex.practicum.mapper.RequestMapper;
@@ -15,7 +16,7 @@ import ru.yandex.practicum.requests.dto.EventRequestStatusUpdateResult;
 import ru.yandex.practicum.requests.dto.ParticipationRequestDto;
 import ru.yandex.practicum.requests.model.Request;
 import ru.yandex.practicum.requests.model.RequestStatus;
-import ru.yandex.practicum.user.model.User;
+import ru.yandex.practicum.user.dto.UserShortDto;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -27,8 +28,8 @@ public class RequestServiceImpl implements RequestService {
     private final RequestRepository requestRepository;
     private final RequestMapper requestMapper;
 
-    private final UserClient userRepository;
-    private final EventClient eventRepository;
+    private final UserClient userClient;
+    private final EventClient eventClient;
 
     @Override
     public List<ParticipationRequestDto> getUserRequests(Long userId) {
@@ -40,22 +41,21 @@ public class RequestServiceImpl implements RequestService {
 
     @Override
     public ParticipationRequestDto createRequest(Long userId, Long eventId) {
-        if (eventRepository.getEventByIdAndInitiatorId(eventId, userId).isPresent()) {
-            throw new InitiatorRequestException("Пользователь с ID - " + userId + ", не найден.");
-        }
+        UserShortDto user = userClient.getUserShortById(userId);
+        EventFullDto event = eventClient.getEventFullById(eventId);
 
+        if (event.getInitiator().getId().equals(user.getId())) {
+            throw new InitiatorRequestException("Инициатор не может оформить запрос в своем собственном событии.");
+        }
         if (requestRepository.findByRequesterAndEvent(userId, eventId).isPresent()) {
             throw new RepeatUserRequestorException("Пользователь с ID - " + userId + ", уже заявился на событие с ID - " + eventId + ".");
         }
-        Event event = eventRepository.getEventFullById(eventId)
-                .orElseThrow(() -> new EntityNotFoundException(Event.class, "Событие с ID - " + eventId + ", не найдено."));
-        if (!event.getState().equals(EventState.PUBLISHED)) {
+        if (!event.getState().equals(EventState.PUBLISHED.toString())) {
             throw new NotPublishEventException("Данное событие ещё не опубликовано");
         }
 
         Request request = new Request();
-        request.setRequester(userRepository.getUserById(userId)
-                .orElseThrow(() -> new EntityNotFoundException(User.class, "Пользователь с ID - " + userId + ", не найден.")).getId());
+        request.setRequester(user.getId());
         request.setEvent(event.getId());
 
         Long confirmedRequests = requestRepository.countRequestsByEventIdAndStatus(event.getId(), RequestStatus.CONFIRMED);
@@ -88,9 +88,9 @@ public class RequestServiceImpl implements RequestService {
 
     @Override
     public List<ParticipationRequestDto> getEventRequests(Long userId, Long eventId) {
-        List<Event> userEvents = eventRepository.getAllEventByInitiatorId(userId);
-        Event event = userEvents.stream()
-                .filter(e -> e.getInitiator().equals(userId))
+        List<EventFullDto> userEvents = eventClient.getAllEventByInitiatorId(userId);
+        EventFullDto event = userEvents.stream()
+                .filter(e -> e.getInitiator().getId().equals(userId))
                 .findFirst()
                 .orElseThrow(() -> new ValidationException("Пользователь с ID - " + userId + ", не является инициатором события с ID - " + eventId + "."));
         return requestRepository.findByEvent(event.getId()).stream()
@@ -101,8 +101,7 @@ public class RequestServiceImpl implements RequestService {
     @Override
     public EventRequestStatusUpdateResult updateStatusRequest(Long userId, Long eventId,
                                                               EventRequestStatusUpdateRequest eventRequest) {
-        Event event = eventRepository.getEventByIdAndInitiatorId(eventId, userId)
-                .orElseThrow(() -> new EntityNotFoundException(Event.class, "Событие с ID - " + eventId + ", не найдено."));
+        EventFullDto event = eventClient.getEventByIdAndInitiatorId(userId, eventId);
         if (event.getParticipantLimit() == 0 || !event.getRequestModeration()) {
             throw new OperationUnnecessaryException("Запрос составлен некорректно.");
         }
@@ -158,12 +157,9 @@ public class RequestServiceImpl implements RequestService {
     }
 
     @Override
-    public Long getCountConfirmedRequestsByEventId(Long eventId) {
-        return requestRepository.countByEventAndStatus(eventId, RequestStatus.CONFIRMED);
-    }
-
-    @Override
-    public List<Request> findAllByEventIdIn(List<Long> eventIds) {
-        return requestRepository.findAllByEventInAndStatus(eventIds, RequestStatus.CONFIRMED);
+    public List<ParticipationRequestDto> findAllByEventIdIn(List<Long> eventIds) {
+        return requestRepository.findAllByEventInAndStatus(eventIds, RequestStatus.CONFIRMED).stream()
+                .map(requestMapper::toParticipationRequestDto)
+                .toList();
     }
 }

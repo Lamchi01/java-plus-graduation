@@ -14,7 +14,6 @@ import ru.yandex.practicum.event.repository.EventRepository;
 import ru.yandex.practicum.exception.EntityNotFoundException;
 
 import java.util.List;
-import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -54,10 +53,5 @@ public class CategoryServiceImpl implements CategoryService {
                 .orElseThrow(() -> new EntityNotFoundException(Category.class, "Категория с ID - " + id + ", не найдена."));
         category.setName(categoryDto.getName());
         return categoryMapper.toCategoryDto(categoryRepository.save(category));
-    }
-
-    @Override
-    public Optional<Category> getFullCategoryById(Long id) {
-        return categoryRepository.findById(id);
     }
 }

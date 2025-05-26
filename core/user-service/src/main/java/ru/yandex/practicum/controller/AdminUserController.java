@@ -8,10 +8,8 @@ import org.springframework.web.bind.annotation.*;
 import ru.yandex.practicum.service.UserService;
 import ru.yandex.practicum.user.dto.UserDto;
 import ru.yandex.practicum.user.dto.UserShortDto;
-import ru.yandex.practicum.user.model.User;
 
 import java.util.List;
-import java.util.Optional;
 
 @RestController
 @RequestMapping(path = "/admin/users")
@@ -37,11 +35,6 @@ public class AdminUserController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void delete(@PathVariable("userId") long id) {
         userService.delete(id);
-    }
-
-    @GetMapping("/{id}")
-    public Optional<User> getUserById(@PathVariable long id) {
-        return userService.getUserById(id);
     }
 
     @GetMapping("/{userId}/short")

@@ -7,9 +7,6 @@ import org.springframework.web.bind.annotation.*;
 import ru.yandex.practicum.comment.dto.CommentDto;
 import ru.yandex.practicum.comment.dto.UpdateCommentDto;
 import ru.yandex.practicum.comment.service.CommentService;
-import ru.yandex.practicum.event.dto.EventCommentCount;
-
-import java.util.List;
 
 @RestController
 @RequestMapping(path = "/admin/comments")
@@ -27,15 +24,5 @@ public class AdminCommentController {
     public CommentDto update(@PathVariable("commentId") long id,
                              @Valid @RequestBody UpdateCommentDto updateCommentDto) {
         return commentService.adminUpdate(id, updateCommentDto);
-    }
-
-    @GetMapping("/count")
-    public List<EventCommentCount> getCountByEventIds(@RequestParam List<Long> eventsIds) {
-        return commentService.findAllByEventIds(eventsIds);
-    }
-
-    @GetMapping("/count/{eventId}")
-    public Long getCountByEventId(@PathVariable long eventId) {
-        return commentService.getCountCommentByEvent_Id(eventId);
     }
 }

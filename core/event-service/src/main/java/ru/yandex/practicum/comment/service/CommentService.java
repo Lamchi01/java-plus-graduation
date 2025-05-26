@@ -3,7 +3,6 @@ package ru.yandex.practicum.comment.service;
 import ru.yandex.practicum.comment.dto.CommentDto;
 import ru.yandex.practicum.comment.dto.InputCommentDto;
 import ru.yandex.practicum.comment.dto.UpdateCommentDto;
-import ru.yandex.practicum.event.dto.EventCommentCount;
 
 import java.util.List;
 
@@ -25,8 +24,4 @@ public interface CommentService {
     List<CommentDto> findCommentsByUserId(Long userId, Integer from, Integer size);
 
     CommentDto findCommentById(Long commentId);
-
-    List<EventCommentCount> findAllByEventIds(List<Long> eventsIds);
-
-    Long getCountCommentByEvent_Id(Long eventId);
 }

@@ -3,11 +3,9 @@ package ru.yandex.practicum.category.controller;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 import ru.yandex.practicum.category.dto.CategoryDto;
-import ru.yandex.practicum.category.model.Category;
 import ru.yandex.practicum.category.service.CategoryService;
 
 import java.util.List;
-import java.util.Optional;
 
 @RestController
 @RequiredArgsConstructor
@@ -24,10 +22,5 @@ public class PublicCategoryController {
     @GetMapping("/{id}")
     public CategoryDto getCategoryById(@PathVariable Long id) {
         return categoryService.getCategoryById(id);
-    }
-
-    @GetMapping("{catId}/full")
-    public Optional<Category> getFullCategoriesById(@PathVariable Long catId) {
-        return categoryService.getFullCategoryById(catId);
     }
 }
