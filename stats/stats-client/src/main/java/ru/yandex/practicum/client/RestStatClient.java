@@ -2,6 +2,7 @@ package ru.yandex.practicum.client;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.client.ServiceInstance;
 import org.springframework.cloud.client.discovery.DiscoveryClient;
 import org.springframework.core.ParameterizedTypeReference;
@@ -11,15 +12,17 @@ import ru.yandex.practicum.ParamDto;
 import ru.yandex.practicum.ParamHitDto;
 import ru.yandex.practicum.ViewStats;
 
-import java.io.InputStream;
 import java.util.List;
-import java.util.Properties;
 
 @Slf4j
 @Component
 public class RestStatClient implements StatClient {
     private final DiscoveryClient discoveryClient;
     private RestClient restClient;
+    @Value("${stats.server.url:stats-server}")
+    private String statsServerUrl;
+    @Value("${main.service.name:ewm-main-service}")
+    private String appName;
 
     @Autowired
     public RestStatClient(DiscoveryClient discoveryClient) {
@@ -28,6 +31,7 @@ public class RestStatClient implements StatClient {
 
     @Override
     public void hit(ParamHitDto paramHitDto) {
+        paramHitDto.setApp(appName);
         try {
             this.restClient = RestClient.create(getInstance().getUri().toString());
             restClient.post()
@@ -63,24 +67,12 @@ public class RestStatClient implements StatClient {
     private ServiceInstance getInstance() {
         try {
             return discoveryClient
-                    .getInstances(getStatsServerName())
+                    .getInstances(statsServerUrl)
                     .getFirst();
         } catch (Exception e) {
             throw new RuntimeException(
                     "Ошибка обнаружения адреса сервиса статистики с id: " + "stats-server", e
             );
-        }
-    }
-
-    private static String getStatsServerName() {
-        Properties properties = new Properties();
-        try (InputStream is = RestStatClient.class.getClassLoader().getResourceAsStream("application.properties")) {
-            properties.load(is);
-            return properties.getProperty("stats.server.name");
-        } catch (Exception e) {
-            log.info(e.getMessage());
-            log.debug("Не найдено или не указано конфигурационное поле stats.server.name");
-            return null;
         }
     }
 }
