@@ -1,0 +1,44 @@
+grpc:
+  server:
+    port: 0
+
+spring:
+  application:
+    name: analyzer
+  jpa:
+    hibernate:
+      ddl-auto: none
+    properties:
+      hibernate:
+        format_sql: true
+    show-sql: true
+  sql:
+    init:
+      mode: always
+  datasource:
+    driver-class-name: org.postgresql.Driver
+    url: jdbc:postgresql://localhost:5432/ewm-main
+    username: user
+    password: password
+
+analyzer:
+  kafka:
+    consumer:
+      user_action:
+        bootstrap.servers: localhost:9092
+        key.deserializer: org.apache.kafka.common.serialization.LongDeserializer
+        value.deserializer: ru.practicum.ewm.stats.avro.deserializer.UserActionDeserializer
+        group.id: analyzer-consumer
+        enable.auto.commit: false
+      event_similarity:
+        bootstrap.servers: localhost:9092
+        key.deserializer: org.apache.kafka.common.serialization.LongDeserializer
+        value.deserializer: ru.practicum.ewm.stats.avro.deserializer.EventSimilarityDeserializer
+        group.id: analyzer-consumer
+        enable.auto.commit: false
+      poll_duration:
+        user_action: 5
+        event_similarity: 5
+    topic:
+      user_action: stats.user-actions.v1
+      event_similarity: stats.events-similarity.v1

@@ -1,0 +1,14 @@
+grpc:
+  server:
+    port: 0
+    security:
+      enabled: false
+
+collector:
+  kafka:
+    producer:
+      bootstrap.servers: localhost:9092
+      key.serializer: org.apache.kafka.common.serialization.LongSerializer
+      value.serializer: ru.practicum.ewm.stats.avro.serializer.AvroSerializer
+    topic:
+      user-action: stats.user-actions.v1

@@ -1,0 +1,17 @@
+aggregator:
+  kafka:
+    producer:
+      bootstrap.servers: localhost:9092
+      key.serializer: org.apache.kafka.common.serialization.LongSerializer
+      value.serializer: ru.practicum.ewm.stats.avro.serializer.AvroSerializer
+    consumer:
+      base:
+        bootstrap.servers: localhost:9092
+        key.deserializer: org.apache.kafka.common.serialization.LongDeserializer
+        value.deserializer: ru.practicum.ewm.stats.avro.deserializer.UserActionDeserializer
+        group.id: aggregator-consumer
+        enable.auto.commit: false
+      poll_duration_seconds: 5
+    topic:
+      user_action: stats.user-actions.v1
+      event_similarity: stats.events-similarity.v1
