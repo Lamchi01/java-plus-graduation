@@ -30,139 +30,189 @@ public class RecommendationsHandlerImpl implements RecommendationsHandler {
     private static final int MAX_SIMILAR_NEIGHBOURS_COUNT = 3;
 
     @Override
-    public List<RecommendedEventProto> getRecommendationsForUser(UserPredictionsRequestProto userPredictionsRequestProto) {
-        Sort sort = Sort.by("lastActionDate").descending();
-        Pageable pageable = PageRequest.of(0, MAX_LAST_VISITED_EVENTS_COUNT, sort);
-        Long userId = userPredictionsRequestProto.getUserId();
-        List<Long> recentVisits = userActionRepository.findAllByUserId(userId, pageable).stream()
+    public List<RecommendedEventProto> getRecommendationsForUser(UserPredictionsRequestProto request) {
+        List<Long> recentVisits = getRecentUserVisits(request.getUserId());
+        List<EventSimilarity> neighbours = findSimilarEvents(recentVisits, Sort.by("score").descending());
+        List<Long> unvisitedEvents = getUnvisitedEvents(neighbours, request.getUserId());
+        List<Long> recommendedEvents = buildInitialRecommendations(neighbours, unvisitedEvents, request.getMaxResult());
+        List<EventSimilarity> recommendationNeighbours = findSimilarEvents(recommendedEvents, Sort.by("score").descending());
+        Map<Long, Double> userActionsMap = getUserActionsMap(recommendationNeighbours, request.getUserId());
+        Map<Long, Map<Long, EventSimilarity>> similarityMap = buildSimilarityMap(recommendationNeighbours, userActionsMap);
+        Map<Long, Double> predictedScores = calculatePredictedScores(similarityMap, userActionsMap);
+        return convertToRecommendedProtoList(predictedScores);
+    }
+
+    @Override
+    public List<RecommendedEventProto> getSimilarEvents(SimilarEventsRequestProto request) {
+        List<EventSimilarity> similarities = findSimilarEvents(
+                List.of(request.getEventId()),
+                Sort.by("score").descending());
+
+        List<Long> unvisitedEvents = getUnvisitedEvents(similarities, request.getUserId());
+
+        return similarities.stream()
+                .filter(similarity -> isUnvisited(similarity, unvisitedEvents, request.getEventId()))
+                .map(similarity -> buildRecommendedProto(similarity, request.getEventId()))
+                .limit(request.getMaxResult())
+                .toList();
+    }
+
+    @Override
+    public List<RecommendedEventProto> getInteractionsCount(InteractionsCountRequestProto request) {
+        List<WeightSum> weightSums = userActionRepository.getWeightSumByEventIdIn(request.getEventIdList());
+        return weightSums.stream()
+                .map(this::convertWeightSumToProto)
+                .toList();
+    }
+
+    private List<Long> getRecentUserVisits(Long userId) {
+        Pageable pageable = PageRequest.of(0, MAX_LAST_VISITED_EVENTS_COUNT, Sort.by("lastActionDate").descending());
+        return userActionRepository.findAllByUserId(userId, pageable).stream()
                 .map(UserAction::getEventId)
                 .toList();
+    }
 
-        List<EventSimilarity> neighbours = eventSimilarityRepository.findAllByEventAInOrEventBIn(
-                recentVisits,
-                recentVisits,
-                sort
-        );
-        List<Long> unvisited = getUnvisitedEvents(neighbours, userId);
-        List<Long> recommendedEvents = new ArrayList<>();
-        for (EventSimilarity eventSimilarity : neighbours) {
-            if (recommendedEvents.size() == userPredictionsRequestProto.getMaxResult()) break;
-            Long eventA = eventSimilarity.getEventA();
-            if (unvisited.contains(eventA)) {
-                recommendedEvents.add(eventA);
-                continue;
-            }
-            Long eventB = eventSimilarity.getEventB();
-            if (unvisited.contains(eventB)) {
-                recommendedEvents.add(eventB);
-                continue;
+    private List<EventSimilarity> findSimilarEvents(List<Long> eventIds, Sort sort) {
+        return eventSimilarityRepository.findAllByEventAInOrEventBIn(eventIds, eventIds, sort);
+    }
+
+    private List<Long> getUnvisitedEvents(List<EventSimilarity> similarities, Long userId) {
+        List<Long> allEventIds = extractAllEventIds(similarities);
+        List<Long> visitedEventIds = getVisitedEventIds(allEventIds, userId);
+
+        return allEventIds.stream()
+                .filter(eventId -> !visitedEventIds.contains(eventId))
+                .distinct()
+                .toList();
+    }
+
+    private List<Long> extractAllEventIds(List<EventSimilarity> similarities) {
+        return similarities.stream()
+                .flatMap(s -> Stream.of(s.getEventA(), s.getEventB()))
+                .toList();
+    }
+
+    private List<Long> getVisitedEventIds(List<Long> eventIds, Long userId) {
+        return userActionRepository.findAllByUserIdAndEventIdIn(userId, eventIds).stream()
+                .map(UserAction::getEventId)
+                .toList();
+    }
+
+    private List<Long> buildInitialRecommendations(List<EventSimilarity> neighbours,
+                                                   List<Long> unvisitedEvents,
+                                                   int maxResult) {
+        Set<Long> recommendations = new LinkedHashSet<>();
+
+        for (EventSimilarity similarity : neighbours) {
+            if (recommendations.size() >= maxResult) break;
+
+            Long eventA = similarity.getEventA();
+            Long eventB = similarity.getEventB();
+
+            if (unvisitedEvents.contains(eventA)) recommendations.add(eventA);
+            if (recommendations.size() < maxResult && unvisitedEvents.contains(eventB)) {
+                recommendations.add(eventB);
             }
         }
 
-        neighbours = eventSimilarityRepository.findAllByEventAInOrEventBIn(
-                recommendedEvents,
-                recommendedEvents,
-                Sort.by("score").descending()
-        );
+        return new ArrayList<>(recommendations);
+    }
 
-        Map<Long, Double> userActionsMap = getUserActionsForEvents(neighbours, userId).stream()
+    private Map<Long, Double> getUserActionsMap(List<EventSimilarity> similarities, Long userId) {
+        return userActionRepository.findAllByUserIdAndEventIdIn(
+                        userId,
+                        extractAllEventIds(similarities))
+                .stream()
                 .collect(Collectors.toMap(UserAction::getEventId, UserAction::getWeight));
-        Map<Long, Map<Long, EventSimilarity>> eventSimilarityMapForCalculate = new HashMap<>();
-        int maxCount = recommendedEvents.size() * MAX_SIMILAR_NEIGHBOURS_COUNT;
+    }
+
+    private Map<Long, Map<Long, EventSimilarity>> buildSimilarityMap(
+            List<EventSimilarity> neighbours,
+            Map<Long, Double> userActions) {
+        Map<Long, Map<Long, EventSimilarity>> similarityMap = new HashMap<>();
         int count = 0;
-        for (EventSimilarity eventSimilarity : neighbours) {
-            if (count == maxCount) break;
-            Long eventA = eventSimilarity.getEventA();
-            Long eventB = eventSimilarity.getEventB();
-            Long eventForCalculate = null;
-            Map<Long, EventSimilarity> eventSimilarityMap = null;
+        int maxCount = neighbours.size() * MAX_SIMILAR_NEIGHBOURS_COUNT;
 
-            if (userActionsMap.containsKey(eventA)) {
-                eventSimilarityMap = eventSimilarityMapForCalculate.computeIfAbsent(eventB, k -> new HashMap<>());
-                eventForCalculate = eventA;
-            }
+        for (EventSimilarity similarity : neighbours) {
+            if (count >= maxCount) break;
 
-            if (userActionsMap.containsKey(eventB)) {
-                eventSimilarityMap = eventSimilarityMapForCalculate.computeIfAbsent(eventA, k -> new HashMap<>());
-                eventForCalculate = eventB;
-            }
+            processSimilarityPair(similarityMap, similarity, userActions, similarity.getEventA(), similarity.getEventB());
+            processSimilarityPair(similarityMap, similarity, userActions, similarity.getEventB(), similarity.getEventA());
+            count++;
+        }
 
-            if (eventSimilarityMap != null && eventSimilarityMap.size() != MAX_SIMILAR_NEIGHBOURS_COUNT) {
-                eventSimilarityMap.put(eventForCalculate, eventSimilarity);
-                count++;
+        return similarityMap;
+    }
+
+    private void processSimilarityPair(
+            Map<Long, Map<Long, EventSimilarity>> similarityMap,
+            EventSimilarity similarity,
+            Map<Long, Double> userActions,
+            Long mainEvent,
+            Long relatedEvent) {
+        if (userActions.containsKey(relatedEvent)) {
+            Map<Long, EventSimilarity> innerMap = similarityMap
+                    .computeIfAbsent(mainEvent, k -> new HashMap<>());
+            if (innerMap.size() < MAX_SIMILAR_NEIGHBOURS_COUNT) {
+                innerMap.put(relatedEvent, similarity);
             }
         }
-        Map<Long, Double> predictedScore = getPredictedScore(eventSimilarityMapForCalculate, userActionsMap);
-        return predictedScore.entrySet().stream()
+    }
+
+    private Map<Long, Double> calculatePredictedScores(
+            Map<Long, Map<Long, EventSimilarity>> similarityMap,
+            Map<Long, Double> userActions) {
+        Map<Long, Double> scores = new HashMap<>();
+
+        similarityMap.forEach((eventId, similarities) -> {
+            double weightScoreSum = 0.0;
+            double weightSum = 0.0;
+
+            for (Map.Entry<Long, EventSimilarity> entry : similarities.entrySet()) {
+                Double weight = userActions.get(entry.getKey());
+                Double score = entry.getValue().getScore();
+                weightScoreSum += weight * score;
+                weightSum += weight;
+            }
+
+            if (weightSum > 0) {
+                scores.put(eventId, weightScoreSum / weightSum);
+            }
+        });
+
+        return scores;
+    }
+
+    private List<RecommendedEventProto> convertToRecommendedProtoList(Map<Long, Double> predictedScores) {
+        return predictedScores.entrySet().stream()
                 .map(entry -> RecommendedEventProto.newBuilder()
                         .setEventId(entry.getKey())
                         .setScore(entry.getValue())
-                        .build()).sorted(Comparator.comparing(RecommendedEventProto::getScore).reversed())
-                .toList();
-    }
-
-    @Override
-    public List<RecommendedEventProto> getSimilarEvents(SimilarEventsRequestProto similarEventsRequestProto) {
-        Sort sort = Sort.by("score").descending();
-        Long eventId = similarEventsRequestProto.getEventId();
-        List<EventSimilarity> eventSimilarities = eventSimilarityRepository.findAllByEventAOrEventB(eventId, eventId, sort);
-        List<Long> unvisitedEventIds = getUnvisitedEvents(eventSimilarities, similarEventsRequestProto.getUserId());
-        return (eventSimilarities.stream()
-                .filter(eventSimilarity -> unvisitedEventIds.contains(eventSimilarity.getEventA())
-                        || unvisitedEventIds.contains(eventSimilarity.getEventB()))
-                .map(eventSimilarity -> RecommendedEventProto.newBuilder()
-                        .setEventId(eventSimilarity.getEventA().equals(eventId) ? eventSimilarity.getEventB() : eventSimilarity.getEventA())
-                        .setScore(eventSimilarity.getScore())
                         .build())
-        ).limit(similarEventsRequestProto.getMaxResult()).toList();
-    }
-
-    @Override
-    public List<RecommendedEventProto> getInteractionsCount(InteractionsCountRequestProto interactionsCountRequestProto) {
-        List<WeightSum> weightSums = userActionRepository.getWeightSumByEventIdIn(interactionsCountRequestProto.getEventIdList());
-        return weightSums.stream()
-                .map(weightSum -> RecommendedEventProto.newBuilder()
-                        .setEventId(weightSum.getEventId())
-                        .setScore(weightSum.getWeightSum())
-                        .build())
+                .sorted(Comparator.comparing(RecommendedEventProto::getScore).reversed())
                 .toList();
     }
 
-    private List<Long> getUnvisitedEvents(List<EventSimilarity> allEvents, Long userId) {
-        List<Long> allEventIds = allEvents.stream()
-                .flatMap(eventSimilarity -> Stream.of(eventSimilarity.getEventA(), eventSimilarity.getEventB()))
-                .toList();
-
-        List<Long> visitedEventsIds = userActionRepository.findAllByUserIdAndEventIdIn(userId, allEventIds).stream()
-                .map(UserAction::getEventId)
-                .toList();
-
-        return allEventIds.stream()
-                .filter(eventId -> !visitedEventsIds.contains(eventId))
-                .toList();
+    private boolean isUnvisited(EventSimilarity similarity, List<Long> unvisitedEvents, Long sourceEventId) {
+        Long eventA = similarity.getEventA();
+        Long eventB = similarity.getEventB();
+        return (eventA.equals(sourceEventId) && unvisitedEvents.contains(eventB)) ||
+                (eventB.equals(sourceEventId) && unvisitedEvents.contains(eventA));
     }
 
-    private List<UserAction> getUserActionsForEvents(List<EventSimilarity> allEvents, Long userId) {
-        List<Long> allEventIds = allEvents.stream()
-                .flatMap(eventSimilarity -> Stream.of(eventSimilarity.getEventA(), eventSimilarity.getEventB()))
-                .toList();
-        return userActionRepository.findAllByUserIdAndEventIdIn(userId, allEventIds);
+    private RecommendedEventProto buildRecommendedProto(EventSimilarity similarity, Long sourceEventId) {
+        Long recommendedEventId = similarity.getEventA().equals(sourceEventId) ?
+                similarity.getEventB() : similarity.getEventA();
+        return RecommendedEventProto.newBuilder()
+                .setEventId(recommendedEventId)
+                .setScore(similarity.getScore())
+                .build();
     }
 
-    private Map<Long, Double> getPredictedScore(Map<Long, Map<Long, EventSimilarity>> eventSimilarityMapForCalculate,
-                                                Map<Long, Double> userActionsMap) {
-        Map<Long, Double> predictedScore = new HashMap<>();
-        for (Map.Entry<Long, Map<Long, EventSimilarity>> entry : eventSimilarityMapForCalculate.entrySet()) {
-            double weightScoreSum = 0.0;
-            double scoreSum = 0.0;
-            for (Map.Entry<Long, EventSimilarity> similarityEntry : entry.getValue().entrySet()) {
-                Double weight = userActionsMap.get(similarityEntry.getKey());
-                Double score = similarityEntry.getValue().getScore();
-                weightScoreSum += weight * score;
-                scoreSum += weight;
-            }
-            predictedScore.put(entry.getKey(), weightScoreSum / scoreSum);
-        }
-        return predictedScore;
+    private RecommendedEventProto convertWeightSumToProto(WeightSum weightSum) {
+        return RecommendedEventProto.newBuilder()
+                .setEventId(weightSum.getEventId())
+                .setScore(weightSum.getWeightSum())
+                .build();
     }
 }

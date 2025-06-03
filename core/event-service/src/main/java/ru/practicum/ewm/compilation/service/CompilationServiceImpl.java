@@ -20,9 +20,8 @@ import ru.practicum.ewm.exception.EntityNotFoundException;
 import ru.practicum.ewm.stats.protobuf.RecommendedEventProto;
 import ru.practicum.ewm.user.dto.UserShortDto;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
+import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
@@ -85,11 +84,35 @@ public class CompilationServiceImpl implements CompilationService {
         Pageable pageable = PageRequest.of(from, size);
         List<Compilation> compilations = compilationRepository.findAllByPinned(pinned, pageable);
 
+        List<Event> allEvents = compilations.stream()
+                .flatMap(compilation -> compilation.getEvents().stream())
+                .toList();
+
+        Map<Long, RecommendedEventProto> ratingsMap = statClient.getInteractionsCount(
+                allEvents.stream().map(Event::getId).toList()
+        ).collect(Collectors.toMap(
+                RecommendedEventProto::getEventId,
+                Function.identity()
+        ));
+
+        Set<Long> initiatorIds = allEvents.stream()
+                .map(Event::getInitiator)
+                .collect(Collectors.toSet());
+        Map<Long, UserShortDto> initiatorsMap = userClient.getAllUsersShort(new ArrayList<>(initiatorIds)).stream()
+                .collect(Collectors.toMap(
+                        UserShortDto::getId,
+                        Function.identity()
+                ));
+
         return compilations.stream()
                 .map(compilation -> compilationMapper.toCompilationDto(
                         compilation,
-                        getShortEventRecommendation(compilation.getEvents())))
-                .toList();
+                        getShortEventRecommendation(
+                                compilation.getEvents(),
+                                ratingsMap,
+                                initiatorsMap
+                                )
+                )).toList();
     }
 
     @Override
@@ -114,6 +137,30 @@ public class CompilationServiceImpl implements CompilationService {
                 .stream()
                 .toList()
         );
+        return eventMapper.mapToShortDto(events, initiators, ratingList);
+    }
+
+    private List<EventShortDto> getShortEventRecommendation(
+            List<Event> events,
+            Map<Long, RecommendedEventProto> ratingsMap,
+            Map<Long, UserShortDto> initiatorsMap
+    ) {
+        if (events.isEmpty()) {
+            return List.of();
+        }
+
+        List<RecommendedEventProto> ratingList = events.stream()
+                .map(Event::getId)
+                .map(ratingsMap::get)
+                .filter(Objects::nonNull)
+                .toList();
+
+        List<UserShortDto> initiators = events.stream()
+                .map(Event::getInitiator)
+                .map(initiatorsMap::get)
+                .filter(Objects::nonNull)
+                .toList();
+
         return eventMapper.mapToShortDto(events, initiators, ratingList);
     }
 }

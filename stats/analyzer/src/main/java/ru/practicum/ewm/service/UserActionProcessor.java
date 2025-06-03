@@ -13,7 +13,6 @@ import ru.practicum.ewm.config.KafkaConsumerProperties;
 import ru.practicum.ewm.service.handler.UserActionHandler;
 import ru.practicum.ewm.stats.avro.UserActionAvro;
 
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;

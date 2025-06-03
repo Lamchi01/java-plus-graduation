@@ -13,7 +13,6 @@ import ru.practicum.ewm.config.KafkaConsumerProperties;
 import ru.practicum.ewm.service.handler.EventSimilarityHandler;
 import ru.practicum.ewm.stats.avro.EventSimilarityAvro;
 
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;

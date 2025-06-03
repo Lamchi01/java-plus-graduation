@@ -73,7 +73,7 @@ public interface EventMapper {
     default List<EventShortDto> mapToShortDto(List<Event> events, List<UserShortDto> initiators,
                                               List<RecommendedEventProto> ratingList) {
         Map<Long, UserShortDto> initiatorsMap = initiators.stream()
-                .collect(Collectors.toMap(UserShortDto::getId, e -> e));
+                .collect(Collectors.toMap(UserShortDto::getId, e -> e, (existing, replacement) -> existing));
 
         return mapToShortDto(events, initiatorsMap, ratingList);
     }
